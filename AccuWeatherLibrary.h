@@ -1,7 +1,9 @@
 #pragma once
 
-#include <ESP8266WiFi.h>
-#include <ESP8266HTTPClient.h>
+#include <WiFi.h>
+#include <HTTPClient.h>
+//#include <ESP8266WiFi.h>
+//#include <ESP8266HTTPClient.h>
 #include "JsonStreamingParser.h"
 #include "JsonListener.h"
 #include <limits.h>
@@ -54,6 +56,7 @@ typedef struct {
     uint8_t SnowProbability;
     uint8_t UVIndex;
     uint8_t WeatherIcon;
+    String PrecipitationIntensity;
 }
 AccuweatherHourlyData;
 
@@ -89,6 +92,7 @@ typedef struct {
     int EpochDate;
     int SunRise;
     int SunSet;
+    String Moon;
     AccuweatherForecastData Day;
     AccuweatherForecastData Night;
 }
@@ -126,6 +130,8 @@ enum AccuParserTokens_ {
     ACCUPARSERMetric,
     ACCUPARSERMinimum,
     ACCUPARSERMoon,
+    ACCUPARSERMoonPhase,
+    ACCUPARSERMoonAge,
     ACCUPARSERNight,
     ACCUPARSERPrecip1hr,
     ACCUPARSERPrecipitationProbability,
@@ -156,6 +162,7 @@ enum AccuParserTokens_ {
     ACCUPARSERDate,
     ACCUPARSEREpochDate,
     ACCUPARSERIcon,
+    ACCUPARSERPrecipitationIntensity,
 };
 
 //I do this to save memory - by default enums are ints, so to save a bit of memory I use chars instead.

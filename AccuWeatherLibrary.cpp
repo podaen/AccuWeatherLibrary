@@ -34,7 +34,9 @@ static const std::map<const String, const AccuParserTokens> stringToTokenMap = {
     { "Maximum", ACCUPARSERMaximum },
     { "Metric", ACCUPARSERMetric },
     { "Minimum", ACCUPARSERMinimum },
-    { "Moon", ACCUPARSERMoon },
+    { "Moon", ACCUPARSERMoon },//zelf aangepast!!!!!!!!!!!!!!!!!!!!!!!
+    { "Phase", ACCUPARSERMoonPhase },//zelf aangepast!!!!!!!!!!!!!!!!!!!!!!!
+    { "Age", ACCUPARSERMoonAge },//zelf aangepast!!!!!!!!!!!!!!!!!!!!!!!
     { "Night", ACCUPARSERNight },
     { "Precip1hr", ACCUPARSERPrecip1hr },
     { "PrecipitationProbability", ACCUPARSERPrecipitationProbability },
@@ -61,8 +63,15 @@ static const std::map<const String, const AccuParserTokens> stringToTokenMap = {
     { "WeatherText", ACCUPARSERWeatherText },
     { "Wind", ACCUPARSERWind },
     { "WindGust", ACCUPARSERWindGust },
+    { "PrecipitationIntensity", ACCUPARSERPrecipitationIntensity },//zelf aangepast!!!!!!!!!!!!!!!!!!!!!!!
+    //{ "HourlyForecasts", ACCUPARSER12HourForecasts },
 };
-
+//String DateTime;
+//uint8_t WeatherIcon;
+//String IconPhrase;
+//String PrecipitationIntensity;
+//float Temperature;
+// 
 //Arrays of stack suffixes - if the stack has this suffix, this means that this piece of data can be obtained
 static const AccuParserTokens LocalObservationDateTime_suffix[] = {ACCUPARSERLocalObservationDateTime};
 static const AccuParserTokens DateTime_suffix[] = {ACCUPARSERDateTime};
@@ -70,6 +79,16 @@ static const AccuParserTokens EpochTime_suffix[] = {ACCUPARSEREpochTime};
 static const AccuParserTokens EpochDateTime_suffix[] = {ACCUPARSEREpochDateTime};
 static const AccuParserTokens Date_suffix[] = {ACCUPARSERDate};
 static const AccuParserTokens EpochDate_suffix[] = {ACCUPARSEREpochDate};
+
+//"Sun":{"Rise":"2022-01-24T08:31:00+01:00","EpochRise":1643009460,"Set":"2022-01-24T17:22:00+01:00","EpochSet":1643041320},
+//"Moon":{"Rise":null,"EpochRise":null,"Set":"2022-01-24T11:23:00+01:00","EpochSet":1643019780,"Phase":"WaningGibbous","Age":22},
+//de data wordt binnen gehaald aan de hand van de naam die moet overeen stemen (ook the varaible type zie
+// https://developer.accuweather.com/accuweather-forecast-api/apis/get/forecasts/v1/daily/1day/%7BlocationKey%7D
+//{ "Moon", ACCUPARSERMoon },
+//{ "Phase", ACCUPARSERMoonPhase },
+//{ "Age", ACCUPARSERMoonAge },
+static const AccuParserTokens Moon_suffix[] = { ACCUPARSERMoon,ACCUPARSERObject, ACCUPARSERMoonPhase };//zelf aangepast!!!!!!!!!!!!!!!!!!!!!!!
+
 static const AccuParserTokens HoursOfSun_suffix[] = {ACCUPARSERHoursOfSun};
 static const AccuParserTokens WeatherText_suffix[] = {ACCUPARSERWeatherText};
 static const AccuParserTokens WeatherIcon_suffix[] = {ACCUPARSERWeatherIcon};
@@ -120,6 +139,8 @@ static const AccuParserTokens Ice_suffix[] = {ACCUPARSERIce, ACCUPARSERObject, A
 
 static const AccuParserTokens baseList_suffix[] = {ACCUPARSERBase, ACCUPARSERList, ACCUPARSERObject};
 static const AccuParserTokens dailyForecastsList_suffix[] = {ACCUPARSERBase, ACCUPARSERObject, ACCUPARSERDailyForecasts, ACCUPARSERList, ACCUPARSERObject};
+
+static const AccuParserTokens PrecipitationIntensity_suffix[] = {ACCUPARSERPrecipitationIntensity };//zelf aangepast!!!!!!!!!!!!!!!!!!!!!!!
 
 /*
  *  Parser base class
@@ -394,7 +415,21 @@ void AccuweatherHourlyParser::value(String value){
     else if (STACK_HAS_SUFFIX(CloudCover_suffix)) {
         data_ptr[baseListIdx].CloudCover = value.toInt();
     }
-
+    //if (STACK_HAS_SUFFIX(DateTime_suffix)) {
+    //    data_ptr[baseListIdx].DateTime = value;
+    //}
+    //else if (STACK_HAS_SUFFIX(WeatherIcon_suffix)) {
+    //    data_ptr[baseListIdx].WeatherIcon = value.toInt();
+    //}
+    //else if (STACK_HAS_SUFFIX(IconPhrase_suffix)) {
+    //    data_ptr[baseListIdx].IconPhrase = value;
+    //}
+    else if (STACK_HAS_SUFFIX(Temperature_suffix)) {
+        data_ptr[baseListIdx].Temperature = value.toFloat();
+    }
+    else if (STACK_HAS_SUFFIX(PrecipitationIntensity_suffix)) {
+        data_ptr[baseListIdx].PrecipitationIntensity = value;
+    }
     popAllKeys();
 }
 
@@ -453,7 +488,9 @@ void AccuweatherDailyParser::value(String value){
             data_ptr[baseListIdx].Day.LongPhrase = value;
         else if (stackContains(ACCUPARSERNight))
             data_ptr[baseListIdx].Night.LongPhrase = value;
-
+    }
+    else if (STACK_HAS_SUFFIX(Moon_suffix)) {//zelf aangepast!!!!!!!!!!!!!!!!!!!!!!!
+        data_ptr[baseListIdx].Moon = value;
     }
     else if (STACK_HAS_SUFFIX(Ice_suffix)) {
         if (stackContains(ACCUPARSERDay))
@@ -576,9 +613,22 @@ void AccuweatherDailyParser::value(String value){
  */
 static const char currentURLTemplate[] PROGMEM = "http://dataservice.accuweather.com/currentconditions/v1/%d?apikey=%s&details=true&language=%s";
 int Accuweather::getCurrent(AccuweatherCurrentData* data_ptr) {
-    char url[256];
+	
+	
+	char url[256];
     snprintf_P(url, 256, currentURLTemplate, locationID, apiKey, languageID);
-    http.begin(url);
+
+    http.begin(url);//werkt wel met MH-ET esp32 mini
+    // 
+    //WiFiClient client;//ZELF AANGEPAST OMDAT ESP8266HTTPClient LIBARY IS VERANDERD
+    //http.begin(client, url);//ZELF AANGEPAST OMDAT ESP8266HTTPClient LIBARY IS VERANDERD
+
+    //WiFiClientSecure* client = new WiFiClientSecure;
+    ////HTTPClient https;
+    //http.begin(*client, url);
+    //Serial.println(length);
+
+
     int httpCode = http.GET();
     if (httpCode > 0) {
       if (httpCode == HTTP_CODE_OK) {
@@ -609,7 +659,16 @@ int Accuweather::getHourly(AccuweatherHourlyData* data_ptr, int hours){
 
     char url[256];
     snprintf_P(url, 256, hourlyURLTemplate, hoursToGet, locationID, apiKey, (isMetric ? "true" : "false"), languageID);
-    http.begin(url);
+	
+    http.begin(url);//werkt wel met MH-ET esp32 mini
+    // 
+	//WiFiClient client;//ZELF AANGEPAST OMDAT ESP8266HTTPClient LIBARY IS VERANDERD
+	//http.begin(client, url);//ZELF AANGEPAST OMDAT ESP8266HTTPClient LIBARY IS VERANDERD
+
+    //WiFiClientSecure* client = new WiFiClientSecure;
+    ////HTTPClient https;
+    //http.begin(*client, url);
+    //Serial.println(length);
 
     int httpCode = http.GET();
     if (httpCode > 0) {
@@ -641,12 +700,61 @@ int Accuweather::getDaily(AccuweatherDailyData* data_ptr, int days){
 
     char url[256];
     snprintf_P(url, 256, dailyURLTemplate, daysToGet, locationID, apiKey, (isMetric ? "true" : "false"), languageID);
-    http.begin(url);
+    
+    http.begin(url);//werkt wel met MH-ET esp32 mini
+    // 
+    //WiFiClient client;//ZELF AANGEPAST OMDAT ESP8266HTTPClient LIBARY IS VERANDERD
+    //http.begin(client, url);//ZELF AANGEPAST OMDAT ESP8266HTTPClient LIBARY IS VERANDERD
+
+    //WiFiClientSecure* client = new WiFiClientSecure;
+    ////HTTPClient https;
+    //http.begin(*client, url);
+
 
     int httpCode = http.GET();
     if (httpCode > 0) {
       if (httpCode == HTTP_CODE_OK) {
             length = http.getSize();
+
+
+            ////Serial.println(length);
+            //String payload;
+            //payload = http.getString(); // save received version
+            //Serial.println(payload);
+
+            //{"Headline":{"EffectiveDate":"2022-01-26T01:00:00+01:00","EffectiveEpochDate":1643155200,"Severity":5,"Text":"Reken dinsdag laat in de nacht op buien",
+            //"Category":"rain","EndDate":"2022-01-26T07:00:00+01:00","EndEpochDate":1643176800,"MobileLink":"http://www.accuweather.com/nl/be/tollembeek/955529/daily-weather-forecast/955529?unit=c",
+            //"Link":"http://www.accuweather.com/nl/be/tollembeek/955529/daily-weather-forecast/955529?unit=c"},
+            //"DailyForecasts":[{"Date":"2022-01-24T07:00:00+01:00","EpochDate":1643004000,
+            //"Sun":{"Rise":"2022-01-24T08:31:00+01:00","EpochRise":1643009460,"Set":"2022-01-24T17:22:00+01:00","EpochSet":1643041320},
+            //"Moon":{"Rise":null,"EpochRise":null,"Set":"2022-01-24T11:23:00+01:00","EpochSet":1643019780,"Phase":"WaningGibbous","Age":22},
+            //"Temperature":{"Minimum":{"Value":-0.3,"Unit":"C","UnitType":17},
+            //"Maximum":{"Value":6.1,"Unit":"C","UnitType":17}},
+            //"RealFeelTemperature":{"Minimum":{"Value":-1.2,"Unit":"C","UnitType":17,"Phrase":"Koud"},"Maximum":{"Value":7.1,"Unit":"C","UnitType":17,"Phrase":"Kil"}},
+            //"RealFeelTemperatureShade":{"Minimum":{"Value":-1.2,"Unit":"C","UnitType":17,"Phrase":"Koud"},"Maximum":{"Value":7.1,"Unit":"C","UnitType":17,"Phrase":"Kil"}},
+            //"HoursOfSun":7.6,"DegreeDaySummary":{"Heating":{"Value":15.0,"Unit":"C","UnitType":17},"Cooling":{"Value":0.0,"Unit":"C","UnitType":17}},
+            //"AirAndPollen":[{"Name":"AirQuality","Value":0,"Category":"Goed","CategoryValue":1,"Type":"Ozon"},
+            //{"Name":"Grass","Value":0,"Category":"Goed","CategoryValue":1},
+            //{"Name":"Mold","Value":0,"Category":"Goed","CategoryValue":1},
+            //{"Name":"Ragweed","Value":0,"Category":"Goed","CategoryValue":1},
+            //{"Name":"Tree","Value":0,"Category":"Goed","CategoryValue":1},
+            //{"Name":"UVIndex","Value":2,"Category":"Goed","CategoryValue":1}],
+            //"Day":{"Icon":4,"IconPhrase":"Wisselend bewolkt","HasPrecipitation":false,"ShortPhrase":"Na een bewolkt begin keert de zon terug",
+            //"LongPhrase":"Na een bewolkt begin keert de zon terug","PrecipitationProbability":0,"ThunderstormProbability":0,"RainProbability":0,"SnowProbability":0,"IceProbability":0,
+            //"Wind":{"Speed":{"Value":7.4,"Unit":"km/h","UnitType":7},"Direction":{"Degrees":93,"Localized":"O","English":"E"}},
+            //"WindGust":{"Speed":{"Value":20.4,"Unit":"km/h","UnitType":7},"Direction":{"Degrees":80,"Localized":"O","English":"E"}},
+            //"TotalLiquid":{"Value":0.0,"Unit":"mm","UnitType":3},
+            //"Rain":{"Value":0.0,"Unit":"mm","UnitType":3},
+            //"Snow":{"Value":0.0,"Unit":"cm","UnitType":4},
+            //"Ice":{"Value":0.0,"Unit":"mm","UnitType":3},
+            //"HoursOfPrecipitation":0.0,"HoursOfRain":0.0,
+            //"HoursOfSnow":0.0,"HoursOfIce":0.0,"CloudCover":25,
+            //"Evapotranspiration":{"Value":0.0,"Unit":"mm","UnitType":3},
+            //"SolarIrradiance":{"Value":2979.7,"Unit":"W/m ","UnitType":33}},
+            //"Night":{"Icon":34,"IconPhrase":"Overwegend helder",
+            //"HasPrecipitation":false,"ShortPhrase":"Laaghangende bewolking en mist","LongPhrase":"Laaghangende bewolking en mist","PrecipitationProbability":0,"ThunderstormProbability":0,"RainProbability":0,"SnowProbability":0,"IceProbability":0,
+            //"Wind":{"Speed":{"Value":5.6,"Unit":"km/h","UnitType":7},"Direction":{"Degrees":65,"Localized":"ONO","English":"ENE"}},"WindGust":{"Speed":{"Value":18.5,"Unit":"km/h","UnitType":7},"Direction":{"Degrees":20,"Localized":"NNO","English":"NNE"}},"TotalLiquid":{"Value":0.0,"Unit":"mm","UnitType":3},"Rain":{"Value":0.0,"Unit":"mm","UnitType":3},"Snow":{"Value":0.0,"Unit":"cm","UnitType":4},"Ice":{"Value":0.0,"Unit":"mm","UnitType":3},"HoursOfPrecipitation":0.0,"HoursOfRain":0.0,"HoursOfSnow":0.0,"HoursOfIce":0.0,"CloudCover":27,"Evapotranspiration":{"Value":0.0,"Unit":"mm","UnitType":3},"SolarIrradiance":{"Value":0.0,"Unit":"W/m ","UnitType":33}},"Sources":["AccuWeather"],"MobileLink":"http://www.accuweather.com/nl/be/tollembeek/955529/daily-weather-forecast/955529?unit=c","Link":"http://www.accuweather.com/nl/be/tollembeek/955529/daily-weather-forecast/955529?unit=c"},{"Date":"2022-01-25T07:00:00+01:00","EpochDate":1643090400,"Sun":{"Rise":"2022-01-25T08:30:00+01:00","EpochRise":1643095800,"Set":"2022-01-25T17:23:00+01:00","EpochSet":1643127780},"Moon":{"Rise":"2022-01-25T00:55:00+01:00","EpochRise":1643068500,"Set":"2022-01-25T11:40:00+01:00","EpochSet":1643107200,"Phase":"Last","Age":23},"Temperature":{"Minimum":{"Value":-0.2,"Unit":"C","UnitType":17},"Maximum":{"Value":4.1,"Unit":"C","UnitType":17}},"RealFeelTemperature":{"Minimum":{"Value":0.2,"Unit":"C","UnitType":17,"Phrase":"Koud"},"Maximum":{"Value":6.0,"Unit":"C","UnitType":17,"Phrase":"Kil"}},"RealFeelTemperatureShade":{"Minimum":{"Value":0.2,"Unit":"C","UnitType":17,"Phrase":"Koud"},"Maximum":{"Value":6.0,"Unit":"C","UnitType":17,"Phrase":"Kil"}},"HoursOfSun":3.1,"DegreeDaySummary":{"Heating":{"Value":16.0,"Unit":"C","UnitType":17},"Cooling":{"Value":0.0,"Unit":"C","UnitType":17}},"AirAndPollen":[{"Name":"AirQuality","Value":0,"Category":"Goed","CategoryValue":1,"Type":"Ozon"},{"Name":"Grass","Value":0,"Category":"Goed","CategoryValue":1},{"Name":"Mold","Value":0,"Category":"Goed","CategoryValue":1},{"Name":"Ragweed","Value":0,"Category":"Goed","CategoryValue":1},{"Name":"Tree","Value":0,"Category":"Goed","CategoryValue":1},{"Name":"UVIndex","Value":1,"Category":"Goed","CategoryValue":1}],"Day":{"Icon":6,"IconPhrase":"Overwegend bewolkt","HasPrecipitation":false,"ShortPhrase":"Laaghangende bewolking en mist","LongPhrase":"Laaghangende bewolking en mist","PrecipitationProbability":0,"ThunderstormProbability":0,"RainProbability":0,"SnowProbability":0,"IceProbability":0,"Wind":{"Speed":{"Value":1.9,"Unit":"km/h","UnitType":7},"Direction":{"Degrees":284,"Localized":"WNW","English":"WNW"}},"WindGust":{"Speed":{"Value":9.3,"Unit":"km/h","UnitType":7},"Direction":{"Degrees":178,"Localized":"S","English":"S"}},"TotalLiquid":{"Value":0.0,"Unit":"mm","UnitType":3},"Rain":{"Value":0.0,"Unit":"mm","UnitType":3},"Snow":{"Value":0.0,"Unit":"cm","UnitType":4},"Ice":{"Value":0.0,"Unit":"mm","UnitType":3},"HoursOfPrecipitation":0.0,"HoursOfRain":0.0,"HoursOfSnow":0.0,"HoursOfIce":0.0,"CloudCover":72,"Evapotranspiration":{"Value":0.0,"Unit":"mm","UnitType":3},"SolarIrradiance":{"Value":1596.6,"Unit":"W/m ","UnitType":33}},"Night":{"Icon":40,"IconPhrase":"Overwegend bewolkt met buien","HasPrecipitation":true,"PrecipitationType":"Rain","PrecipitationIntensity":"Light","ShortPhrase":"Mogelijk een bui","LongPhrase":"Mogelijk een bui","PrecipitationProbability":55,"ThunderstormProbability":11,"RainProbability":55,"SnowProbability":45,"IceProbability":1,"Wind":{"Speed":{"Value":3.7,"Unit":"km/h","UnitType":7},"Direction":{"Degrees":242,"Localized":"WZW","English":"WSW"}},"WindGust":{"Speed":{"Value":13.0,"Unit":"km/h","UnitType":7},"Direction":{"Degrees":218,"Localized":"ZW","English":"SW"}},"TotalLiquid":{"Value":0.3,"Unit":"mm","UnitType":3},"Rain":{"Value":0.3,"Unit":"mm","UnitType":3},"Snow":{"Value":0.0,"Unit":"cm","UnitType":4},"Ice":{"Value":0.0,"Unit":"mm","UnitType":3},"HoursOfPrecipitation":0.5,"HoursOfRain":0.5,"HoursOfSnow":0.0,"HoursOfIce":0.0,"CloudCover":82,"Evapotranspiration":{"Value":0.0,"Unit":"mm","UnitType":3},"SolarIrradiance":{"Value":0.0,"Unit":"W/m ","UnitType":33}},"Sources":["AccuWeather"],"MobileLink":"http://www.accuweather.com/nl/be/tollembeek/955529/daily-weather-forecast/955529?day=1&unit=c","Link":"http://www.accuweather.com/nl/be/tollembeek/955529/daily-weather-forecast/955529?day=1&unit=c"},{"Date":"2022-01-26T07:00:00+01:00","EpochDate":1643176800,"Sun":{"Rise":"2022-01-26T08:29:00+01:00","EpochRise":1643182140,"Set":"2022-01-26T17:25:00+01:00","EpochSet":1643214300},"Moon":{"Rise":"2022-01-26T02:16:00+01:00","EpochRise":1643159760,"Set":"2022-01-26T12:00:00+01:00","EpochSet":1643194800,"Phase":"WaningCrescent","Age":24},"Temperature":{"Minimum":{"Value":1.8,"Unit":"C","UnitType":17},"Maximum":{"Value":4.6,"Unit":"C","UnitType":17}},"RealFeelTemperature":{"Minimum":{"Value":-2.1,"Unit":"C","UnitType":17,"Phrase":"Koud"},"Maximum":{"Value":3.3,"Unit":"C","UnitType":17,"Phrase":"Koud"}},"RealFeelTemperatureShade":{"Minimum":{"Value":-2.1,"Unit":"C","UnitType":17,"Phrase":"Koud"},"Maximum":{"Value":3.3,"Unit":"C","UnitType":17,"Phrase":"Koud"}},"HoursOfSun":2.2,"DegreeDaySummary":{"Heating":{"Value":15.0,"Unit":"C","UnitType":17},"Cooling":{"Value":0.0,"Unit":"C","UnitType":17}},"AirAndPollen":[{"Name":"AirQuality","Value":0,"Category":"Goed","CategoryValue":1,"Type":"Ozon"},{"Name":"Grass","Value":0,"Category":"Goed","CategoryValue":1},{"Name":"Mold","Value":0,"Category":"Goed","CategoryValue":1},{"Name":"Ragweed","Value":0,"Category":"Goed","CategoryValue":1},{"Name":"Tree","Value":0,"Category":"Goed","CategoryValue":1},{"Name":"UVIndex","Value":1,"Category":"Goed","CategoryValue":1}],"Day":{"Icon":6,"IconPhrase":"Overwegend bewolkt","HasPrecipitation":false,"ShortPhrase":"Laaghangende bewolking en mist","LongPhrase":"Laaghangende bewolking en mist","PrecipitationProbability":2,"ThunderstormProbability":0,"RainProbability":2,"SnowProbability":0,"IceProbability":0,"Wind":{"Speed":{"Value":7.4,"Unit":"km/h","UnitType":7},"Direction":{"Degrees":243,"Localized":"WZW","English":"WSW"}},"WindGust":{"Speed":{"Value":24.1,"Unit":"km/h","UnitType":7},"Direction":{"Degrees":271,"Localized":"W","English":"W"}},"TotalLiquid":{"Value":0.0,"Unit":"mm","UnitType":3},"Rain":{"Value":0.0,"Unit":"mm","UnitType":3},"Snow":{"Value":0.0,"Unit":"cm","UnitType":4},"Ice":{"Value":0.0,"Unit":"mm","UnitType":3},"HoursOfPrecipitation":0.0,"HoursOfRain":0.0,"HoursOfSnow":0.0,"HoursOfIce":0.0,"CloudCover":85,"Evapotranspiration":{"Value":0.0,"Unit":"mm","UnitType":3},"SolarIrradiance":{"Value":1217.9,"Unit":"W/m ","UnitType":33}},"Night":{"Icon":8,"IconPhrase":"Druilerig","HasPrecipitation":false,"ShortPhrase":"Lage wolken","LongPhrase":"Lage wolken","PrecipitationProbability":25,"ThunderstormProbability":0,"RainProbability":25,"SnowProbability":0,"IceProbability":0,"Wind":{"Speed":{"Value":14.8,"Unit":"km/h","UnitType":7},"Direction":{"Degrees":224,"Localized":"ZW","English":"SW"}},"WindGust":{"Speed":{"Value":31.5,"Unit":"km/h","UnitType":7},"Direction":{"Degrees":240,"Localized":"WZW","English":"WSW"}},"TotalLiquid":{"Value":0.0,"Unit":"mm","UnitType":3},"Rain":{"Value":0.0,"Unit":"mm","UnitType":3},"Snow":{"Value":0.0,"Unit":"cm","UnitType":4},"Ice":{"Value":0.0,"Unit":"mm","UnitType":3},"HoursOfPrecipitation":0.0,"HoursOfRain":0.0,"HoursOfSnow":0.0,"HoursOfIce":0.0,"CloudCover":100,"Evapotranspiration":{"Value":0.0,"Unit":"mm","UnitType":3},"SolarIrradiance":{"Value":0.0,"Unit":"W/m ","UnitType":33}},"Sources":["AccuWeather"],"MobileLink":"http://www.accuweather.com/nl/be/tollembeek/955529/daily-weather-forecast/955529?day=2&unit=c","Link":"http://www.accuweather.com/nl/be/tollembeek/955529/daily-weather-forecast/955529?day=2&unit=c"},{"Date":"2022-01-27T07:00:00+01:00","EpochDate":1643263200,"Sun":{"Rise":"2022-01-27T08:28:00+01:00","EpochRise":1643268480,"Set":"2022-01-27T17:27:00+01:00","EpochSet":1643300820},"Moon":{"Rise":"2022-01-27T03:41:00+01:00","EpochRise":1643251260,"Set":"2022-01-27T12:25:00+01:00","EpochSet":1643282700,"Phase":"WaningCrescent","Age":25},"Temperature":{"Minimum":{"Value":1.7,"Unit":"C","UnitType":17},"Maximum":{"Value":7.8,"Unit":"C","UnitType":17}},"RealFeelTemperature":{"Minimum":{"Value":-1.0,"Unit":"C","UnitType":17,"Phrase":"Koud"},"Maximum":{"Value":4.7,"Unit":"C","UnitType":17,"Phrase":"Kil"}},"RealFeelTemperatureShade":{"Minimum":{"Value":-1.0,"Unit":"C","UnitType":17,"Phrase":"Koud"},"Maximum":{"Value":4.7,"Unit":"C","UnitType":17,"Phrase":"Kil"}},"HoursOfSun":3.4,"DegreeDaySummary":{"Heating":{"Value":13.0,"Unit":"C","UnitType":17},"Cooling":{"Value":0.0,"Unit":"C","UnitType":17}},"AirAndPollen":[{"Name":"AirQuality","Value":0,"Category":"Goed","CategoryValue":1,"Type":"Ozon"},{"Name":"Grass","Value":0,"Category":"Goed","CategoryValue":1},{"Name":"Mold","Value":0,"Category":"Goed","CategoryValue":1},{"Name":"Ragweed","Value":0,"Category":"Goed","CategoryValue":1},{"Name":"Tree","Value":0,"Category":"Goed","CategoryValue":1},{"Name":"UVIndex","Value":1,"Category":"Goed","CategoryValue":1}],"Day":{"Icon":13,"IconPhrase":"Overwegend bewolkt met buien","HasPrecipitation":true,"PrecipitationType":"Rain","PrecipitationIntensity":"Light","ShortPhrase":"Enkele buien","LongPhrase":"Enkele buien","PrecipitationProbability":85,"ThunderstormProbability":17,"RainProbability":85,"SnowProbability":0,"IceProbability":0,"Wind":{"Speed":{"Value":16.7,"Unit":"km/h","UnitType":7},"Direction":{"Degrees":284,"Localized":"WNW","English":"WNW"}},"WindGust":{"Speed":{"Value":33.3,"Unit":"km/h","UnitType":7},"Direction":{"Degrees":250,"Localized":"WZW","English":"WSW"}},"TotalLiquid":{"Value":3.0,"Unit":"mm","UnitType":3},"Rain":{"Value":3.0,"Unit":"mm","UnitType":3},"Snow":{"Value":0.0,"Unit":"cm","UnitType":4},"Ice":{"Value":0.0,"Unit":"mm","UnitType":3},"HoursOfPrecipitation":2.0,"HoursOfRain":2.0,"HoursOfSnow":0.0,"HoursOfIce":0.0,"CloudCover":70,"Evapotranspiration":{"Value":0.0,"Unit":"mm","UnitType":3},"SolarIrradiance":{"Value":1337.7,"Unit":"W/m ","UnitType":33}},"Night":{"Icon":38,"IconPhrase":"Overwegend bewolkt","HasPrecipitation":false,"ShortPhrase":"Overwegend bewolkt","LongPhrase":"Overwegend bewolkt","PrecipitationProbability":1,"ThunderstormProbability":0,"RainProbability":1,"SnowProbability":0,"IceProbability":0,"Wind":{"Speed":{"Value":11.1,"Unit":"km/h","UnitType":7},"Direction":{"Degrees":290,"Localized":"WNW","English":"WNW"}},"WindGust":{"Speed":{"Value":14.8,"Unit":"km/h","UnitType":7},"Direction":{"Degrees":225,"Localized":"ZW","English":"SW"}},"TotalLiquid":{"Value":0.0,"Unit":"mm","UnitType":3},"Rain":{"Value":0.0,"Unit":"mm","UnitType":3},"Snow":{"Value":0.0,"Unit":"cm","UnitType":4},"Ice":{"Value":0.0,"Unit":"mm","UnitType":3},"HoursOfPrecipitation":0.0,"HoursOfRain":0.0,"HoursOfSnow":0.0,"HoursOfIce":0.0,"CloudCover":59,"Evapotranspiration":{"Value":0.0,"Unit":"mm","UnitType":3},"SolarIrradiance":{"Value":0.0,"Unit":"W/m ","UnitType":33}},"Sources":["AccuWeather"],"MobileLink":"http://www.accuweather.com/nl/be/tollembeek/955529/daily-weather-forecast/955529?day=3&unit=c","Link":"http://www.accuweather.com/nl/be/tollembeek/955529/daily-weather-forecast/955529?day=3&unit=c"},{"Date":"2022-01-28T07:00:00+01:00","EpochDate":1643349600,"Sun":{"Rise":"2022-01-28T08:26:00+01:00","EpochRise":1643354760,"Set":"2022-01-28T17:29:00+01:00","EpochSet":1643387340},"Moon":{"Rise":"2022-01-28T05:06:00+01:00","EpochRise":1643342760,"Set":"2022-01-28T13:01:00+01:00","EpochSet":1643371260,"Phase":"WaningCrescent","Age":26},"Temperature":{"Minimum":{"Value":2.5,"Unit":"C","UnitType":17},"Maximum":{"Value":6.7,"Unit":"C","UnitType":17}},"RealFeelTemperature":{"Minimum":{"Value":-0.2,"Unit":"C","UnitType":17,"Phrase":"Koud"},"Maximum":{"Value":3.5,"Unit":"C","UnitType":17,"Phrase":"Kil"}},"RealFeelTemperatureShade":{"Minimum":{"Value":-0.2,"Unit":"C","UnitType":17,"Phrase":"Koud"},"Maximum":{"Value":3.5,"Unit":"C","UnitType":17,"Phrase":"Kil"}},"HoursOfSun":5.5,"DegreeDaySummary":{"Heating":{"Value":13.0,"Unit":"C","UnitType":17},"Cooling":{"Value":0.0,"Unit":"C","UnitType":17}},"AirAndPollen":[{"Name":"AirQuality","Value":0,"Category":"Goed","CategoryValue":1,"Type":"Ozon"},{"Name":"Grass","Value":0,"Category":"Goed","CategoryValue":1},{"Name":"Mold","Value":0,"Category":"Goed","CategoryValue":1},{"Name":"Ragweed","Value":0,"Category":"Goed","CategoryValue":1},{"Name":"Tree","Value":0,"Category":"Goed","CategoryValue":1},{"Name":"UVIndex","Value":1,"Category":"Goed","CategoryValue":1}],"Day":{"Icon":3,"IconPhrase":"Deels zonnig","HasPrecipitation":false,"ShortPhrase":"Deels zonnig","LongPhrase":"Deels zonnig","PrecipitationProbability":2,"ThunderstormProbability":0,"RainProbability":2,"SnowProbability":0,"IceProbability":0,"Wind":{"Speed":{"Value":13.0,"Unit":"km/h","UnitType":7},"Direction":{"Degrees":228,"Localized":"ZW","English":"SW"}},"WindGust":{"Speed":{"Value":27.8,"Unit":"km/h","UnitType":7},"Direction":{"Degrees":232,"Localized":"ZW","English":"SW"}},"TotalLiquid":{"Value":0.0,"Unit":"mm","UnitType":3},"Rain":{"Value":0.0,"Unit":"mm","UnitType":3},"Snow":{"Value":0.0,"Unit":"cm","UnitType":4},"Ice":{"Value":0.0,"Unit":"mm","UnitType":3},"HoursOfPrecipitation":0.0,"HoursOfRain":0.0,"HoursOfSnow":0.0,"HoursOfIce":0.0,"CloudCover":45,"Evapotranspiration":{"Value":0.0,"Unit":"mm","UnitType":3},"SolarIrradiance":{"Value":1682.2,"Unit":"W/m ","UnitType":33}},"Night":{"Icon":38,"IconPhrase":"Overwegend bewolkt","HasPrecipitation":false,"ShortPhrase":"Overwegend bewolkt","LongPhrase":"Overwegend bewolkt","PrecipitationProbability":8,"ThunderstormProbability":0,"RainProbability":8,"SnowProbability":0,"IceProbability":0,"Wind":{"Speed":{"Value":13.0,"Unit":"km/h","UnitType":7},"Direction":{"Degrees":225,"Localized":"ZW","English":"SW"}},"WindGust":{"Speed":{"Value":29.6,"Unit":"km/h","UnitType":7},"Direction":{"Degrees":231,"Localized":"ZW","English":"SW"}},"TotalLiquid":{"Value":0.0,"Unit":"mm","UnitType":3},"Rain":{"Value":0.0,"Unit":"mm","UnitType":3},"Snow":{"Value":0.0,"Unit":"cm","UnitType":4},"Ice":{"Value":0.0,"Unit":"mm","UnitType":3},"HoursOfPrecipitation":0.0,"HoursOfRain":0.0,"HoursOfSnow":0.0,"HoursOfIce":0.0,"CloudCover":76,"Evapotranspiration":{"Value":0.0,"Unit":"mm","UnitType":3},"SolarIrradiance":{"Value":0.0,"Unit":"W/m ","UnitType":33}},"Sources":["AccuWeather"],"MobileLink":"http://www.accuweather.com/nl/be/tollembeek/955529/daily-weather-forecast/955529?day=4&unit=c","Link":"http://www.accuweather.com/nl/be/tollembeek/955529/daily-weather-forecast/955529?day=4&unit=c"}]}
+
             parser.reset();
             listener = new AccuweatherDailyParser(data_ptr, days);
             parser.setListener(listener);
